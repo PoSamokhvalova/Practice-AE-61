@@ -1,0 +1,79 @@
+---
+title: "Naive Bayes"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Upload data
+```{r}
+inf <- read.csv("bank.csv", header = TRUE, encoding = "UNICOD")
+inf <- subset(inf, select = -c(education,default,contact,pdays,poutcome,month,campaign,previous))
+require(dplyr)
+inf <- inf %>%
+      mutate(deposit = ifelse(deposit == "no",0,1))
+glimpse(inf)
+```
+
+# Features Scaling
+```{r}
+inf <- inf[,c("balance","duration","deposit")]
+sc <- scale(inf)
+inf$balance <- sc[,c("balance")]
+inf$duration <- sc[,c("duration")]
+glimpse (inf)
+```
+#### Conclusion: For modeling were chosen quantitative variables, because they turned out to be significant. We scaled the quantitative variables.
+
+# Splitting the dataset into the TRAIN set and TEST set
+```{r}
+set.seed(123)
+library(caTools)
+split = sample.split(inf$deposit, SplitRatio = 2/3)
+inf_train = subset(inf, split == TRUE)
+inf_test = subset(inf, split == FALSE)
+```
+#### Conclusion: dataset is split into train set and test set.
+
+# Fitting 
+```{r}
+library(e1071)
+inf_train$deposit <- as.factor(inf_train$deposit)
+inf_test$deposit <- as.factor(inf_test$deposit)
+class_nb = naiveBayes(deposit ~ balance + duration, data = inf_train)
+```
+#### Conclusion: naiveBayes function was used to teach the model.
+
+# Predicting
+```{r}
+y <- predict(class_nb, inf_test[, c("balance","duration")])
+```
+#### Conclusion: Object classes (vector y) are defined.
+
+## Confusion Matrix
+```{r}
+cm = table(inf_test[, 'deposit'], y)
+print(cm)
+```
+#### Conclusion: Accuracy of the model - (1741+801)/3721=68.3%. Part of incorrectly classified cases - (962+217)/3721 = 31.7%. Sensitivity of the model is 801/(801+962)=45.4%, specificity is 1741/(1741+217)=88.9%, ie the model is more sensitive to the detection of positive cases.
+
+# Visualising the Test set results
+```{r}
+library(ggplot2)
+set = inf_test[,c('balance','duration','deposit')]
+X1 = seq(min(set['balance']) - 1, max(set['balance']) + 1, by = 0.1)
+X2 = seq(min(set['duration']) - 1, max(set['duration']) + 1, by = 0.1)
+grid_set = expand.grid(X1, X2)
+colnames(grid_set) = c('balance', 'duration')
+y_grid = predict(class_nb, grid_set)
+plot(set[, -3],
+     main = 'Naive Bayes',
+     xlab = 'balance', ylab = 'duration',
+     xlim = range(X1), ylim = range(X2))
+contour(X1, X2, matrix(as.numeric(y_grid), length(X1), length(X2)), add = TRUE)
+points(grid_set, pch = '.', col = ifelse(y_grid == 1, 'tomato', 'springgreen3'))
+points(set, pch = 21, bg = ifelse(set[, 3] == 1, 'red3', 'green4'))
+```
+#### Conclusion: Ñustomers who do not have deposits are marked in green on a graph, and those who do are in red. Zone of high probability of taking a deposit is marked in red.

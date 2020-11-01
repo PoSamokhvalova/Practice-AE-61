@@ -1,0 +1,60 @@
+---
+title: "Hierarchical Clustering"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Upload data
+```{r}
+inf <- read.csv("bank.csv", header = TRUE, encoding = "UNICOD")
+inf <- subset(inf, select = -c(education,default,contact,pdays,poutcome,month,campaign,previous))
+require(dplyr)
+inf <- inf[, c("balance","duration")]
+glimpse(inf)
+```
+#### Conclusion: For building a clustering model was used data on the availability of deposit account. Quantitative variables were left for modeling. Dataset does not require division into training and test samples and scaling.
+
+# Hierarchical clustering
+```{r}
+model_hc <- hclust(dist(inf), method = "ward.D" )
+plot(model_hc, main = paste('Dendrogram'))
+```
+#### Conclusion: Dendrogram was built using the Ward.D. method.
+
+## Fitting HC to the dataset
+```{r}
+y_hc <- cutree(model_hc, k = 3)
+#cluster cores
+aggregate(inf,by=list(y_hc),FUN=mean)
+#Cluster stat
+inf$hc <- y_hc
+table(inf$hc)
+```
+#### Conclusion: Based on a dendogram's analysis were detected 3 clusters.
+
+## Plotting the dendrogram
+```{r}
+plot(model_hc, cex = 0.7, labels = FALSE)
+rect.hclust(model_hc, k = 3, border = 2:5)
+```
+#### Conclusion: Was complited a visualization of clusters on the dendrogram.
+
+### Visualising the clusters
+```{r}
+library(cluster)
+clusplot(inf[,c("balance","duration")],
+         y_hc,
+         lines = 0,
+         shade = TRUE,
+         color = TRUE,
+         labels= 0,
+         plotchar = FALSE,
+         span = TRUE,
+         main = paste("Clusters"),
+         xlab = "balance",
+         ylab = "duration")
+```
+#### Conclusion: Was performed a visualization of clusters on the dataset.

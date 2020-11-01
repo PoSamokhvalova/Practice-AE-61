@@ -1,0 +1,97 @@
+---
+title: "Nonlinear Regression"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Upload data
+```{r}
+info_train <- read.csv2("udemy_train.csv", header = TRUE, encoding = "UNICOD")
+info_test <- read.csv2("udemy_test.csv", header = TRUE, encoding = "UNICOD")
+```
+# Decision Tree Regression
+
+## Fitting simple tree
+```{r}
+# install.packages('rpart')
+library(rpart)
+dt <- rpart(price_detail__amount ~ num_published_lectures, info_train, control = rpart.control(minsplit = 50))
+plot(dt)
+text(dt, pos = 1, cex = .75, col = 1, font = 1)
+```
+#### Conclusion: A decision tree was built. Exogenous variable - num_published_lectures
+
+## Predicting
+```{r}
+p_dt <- predict(dt, info_test)
+
+train_mse_dt <- sum((info_train$price_detail__amount-predict(dt, info_train))^2) /length(info_train$price_detail__amount)
+test_mse_dt <- sum((info_test$price_detail__amount-p_dt)^2)/length(p_dt)
+
+train_mse_dt
+test_mse_dt
+```
+#### Conclusion: the values of the root mean square error are: in the training sample - 8965032, in the test sample - 8604695, ie there is no retraining.
+
+## Visualising
+```{r}
+library(ggplot2)
+x_grid <- seq(min(info_train$num_published_lectures), max(info_train$num_published_lectures), 0.01)
+ggplot() +
+  geom_point(aes(info_train$num_published_lectures, info_train$price_detail__amount),colour = 'red') +
+  geom_point(aes(info_test$num_published_lectures, info_test$price_detail__amount),colour = 'dark green') +
+  geom_line(aes(x_grid, predict(dt, data.frame(num_published_lectures = x_grid))),colour = 'blue') +
+  ggtitle('price_detail__amount vs num_published_lectures') +
+  xlab('num_published_lectures') +
+  ylab('price_detail__amount')
+```
+#### Conclusion: Points of the training sample are marked in red, points of the test sample are marked in green, and the model values are marked in blue.
+
+# Random forest
+
+## Fitting
+```{r}
+#install.packages('randomForest')
+library(randomForest)
+set.seed(1234)
+rf = randomForest(x = info_train['num_published_lectures'],
+                         y = info_train$price_detail__amount,
+                         ntree = 15)
+```
+### Conclusion: Was built a random forest of 15 trees.Exogenous variable - num_published_lectures.
+
+## Predicting
+```{r}
+p_rf <- predict(rf, info_test)
+
+train_mse_rf <- sum((info_train$price_detail__amount-predict(rf, info_train))^2)/length(info_train$price_detail__amount)
+test_mse_rf <- sum((info_test$price_detail__amount-p_rf)^2)/length(p_rf)
+
+train_mse_rf
+test_mse_rf
+```
+#### Conclusion: Value of the root mean square error impoved in the training sample - 8714352, in the test sample it is 8633330, ie there is no retraining.
+
+## Visualising
+```{r}
+ggplot() +
+  geom_point(aes(info_train$num_published_lectures, info_train$price_detail__amount),colour = 'red') +
+  geom_point(aes(info_test$num_published_lectures, info_test$price_detail__amount),colour = 'dark green') +
+  geom_line(aes(x_grid, predict(rf, data.frame(num_published_lectures = x_grid))),colour = 'blue') +
+  ggtitle('price_detail__amount vs num_published_lectures') +
+  xlab('num_published_lectures') +
+  ylab('ActualPower')
+```
+#### Conclusion: Points of the training sample are marked in red, points of the test sample are marked in green, and the model values are marked in blue.
+
+# Saving results
+```{r}
+fit <- read.csv2('Lab3_fit.csv', header = TRUE, encoding = 'UNICOD')
+fit$p_dt <- p_dt
+fit$p_rf <- p_rf
+head(fit)
+write.csv2(fit[-1], file = "Lab4_fit.csv")
+```
+#### Conclusion: Simulation results are saved.

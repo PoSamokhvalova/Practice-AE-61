@@ -1,0 +1,75 @@
+---
+title: "K-nearest neighbors"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Upload data
+```{r}
+inf <- read.csv("bank.csv", header = TRUE, encoding = "UNICOD")
+inf <- subset(inf, select = -c(education,default,contact,pdays,poutcome,month,campaign,previous))
+require(dplyr)
+inf <- inf %>%
+      mutate(deposit = ifelse(deposit == "no",0,1))
+glimpse(inf)
+```
+
+# Features Scaling
+```{r}
+inf <- inf[,c("balance","duration","deposit")]
+sc <- scale(inf)
+inf$balance <- sc[,c("balance")]
+inf$duration <- sc[,c("duration")]
+glimpse (inf)
+```
+#### Conclusion: For modeling were chosen quantitative variables, because they turned out to be significant. We scaled the quantitative variables.
+
+# Splitting the dataset into the TRAIN set and TEST set
+```{r}
+set.seed(123)
+library(caTools)
+split = sample.split(inf$deposit, SplitRatio = 2/3)
+inf_train = subset(inf, split == TRUE)
+inf_test = subset(inf, split == FALSE)
+```
+#### Conclusion: dataset is split into train set and test set.
+
+# Fitting & predicting
+```{r}
+library(class)
+y = knn(train = inf_train[,c("balance","duration")],
+        test = inf_test[,c("balance","duration")],
+        cl = inf_train[, "deposit"],
+        k = 5,
+        prob = TRUE)
+```
+#### Conclusion: According to the model of k-nearest neighbors both training and forecasting are carried out by one function. The result is a vector of object classes.
+
+# Confusion Matrix
+```{r}
+cm = table(inf_test[, "deposit"], y == 1)
+print(cm)
+```
+#### Conclusion: Accuracy of the model - (1390+1207)/3721=69.8%. Part of incorrectly classified cases - (556+568)/3721 = 30.2%. Sensitivity of the model is 1207/(1207+556)=68.5%, specificity is 1390/(1390+568)=71%.
+
+## Visualising the Test set results
+```{r}
+library(ggplot2)
+set = inf_test[,c('balance','duration','deposit')]
+X1 = seq(min(set['balance']) - 1, max(set['duration']) + 1, by = 0.1)
+X2 = seq(min(set['balance']) - 1, max(set['duration']) + 1, by = 0.1)
+grid_set = expand.grid(X1, X2)
+colnames(grid_set) = c('balance', 'duration')
+y_grid = knn(train = inf_train[,c('balance','duration')], test = grid_set, cl = inf_train[, 'deposit'], k = 5)
+plot(set[, -3],
+     main = 'KNN',
+     xlab = 'balance', ylab = 'duration',
+     xlim = range(X1), ylim = range(X2))
+contour(X1, X2, matrix(as.numeric(y_grid), length(X1), length(X2)), add = TRUE)
+points(grid_set, pch = '.', col = ifelse(y_grid == 1, 'tomato', 'springgreen3'))
+points(set, pch = 21, bg = ifelse(set[, 3] == 1, 'red3', 'green4'))
+```
+#### Cocnlusion: Ñustomers who do not have deposits are marked in green on a graph, and those who do are in red. Zone of high probability of taking a deposit is marked in red.

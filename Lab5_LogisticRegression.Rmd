@@ -1,0 +1,107 @@
+---
+title: "Logistic Regression"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Upload data
+```{r}
+inf <- read.csv("bank.csv", header = TRUE, encoding = "UNICOD")
+inf <- subset(inf, select = -c(education,default,contact,pdays,poutcome,month,campaign,previous))
+require(dplyr)
+inf <- inf %>%
+      mutate(deposit = ifelse(deposit == "no",0,1))
+glimpse(inf)
+head(inf)
+```
+
+# Statistics
+
+## Descriptive statistics
+```{r}
+library (psych)
+des_inf <- describe(inf)
+View (des_inf)
+```
+#### Conclusion: num of observations - 11 162, num of variables - 9. There are no missed values and ejections.
+
+# Features Scaling
+```{r}
+sc <- inf[,c("age","balance","day","duration")]
+sc <- scale(sc)
+inf$age <- sc[,c("age")]
+inf$balance <- sc[,c("balance")]
+inf$day <- sc[,c("day")]
+inf$duration <- sc[,c("duration")]
+glimpse (inf)
+```
+#### Conclusion: Classification models require pre-scaling of quantitative variables.
+
+# Splitting the dataset into the TRAIN set and TEST set
+```{r}
+set.seed(123)
+library(caTools)
+split = sample.split(inf$deposit, SplitRatio = 2/3)
+inf_train = subset(inf, split == TRUE)
+inf_test = subset(inf, split == FALSE)
+```
+#### Conclusion: dataset is split into train set and test set.
+
+# Fitting (Benchmark model)
+```{r}
+class_lr <- glm(deposit ~ ., inf_train, family=binomial)
+summary(class_lr)
+```
+
+# Optimized model
+```{r}
+class_opt <- glm(deposit ~ balance + duration, inf_train, family = binomial)
+summary(class_opt)
+```
+#### Conclusion: All variables of optimized model are significant.
+
+# Predicting
+```{r}
+p <- predict(class_opt, inf_test[, c("balance","duration")], type = "response")
+y <- ifelse(p > 0.5, 1, 0)
+```
+#### Conclusion: Were calculated probabilities of assigning objects to each of the two classes (vector p). Were defined classes of objects (vector y).
+
+# Confusion Matrix
+```{r}
+cm = table(inf_test[, "deposit"], y > 0.5)
+print(cm)
+```
+#### Conclusion: Accuracy of the model - (1627+1024)/3721=71.2%. Part of incorrectly classified cases - (739+331)/3721 = 28.8%. Sensitivity of the model is 1024/(1024+739)=58%, specificity is 1627/(1627+331)=83%, ie the model is more sensitive to the detection of positive cases.
+
+## ROC
+```{r}
+library(ROCR)
+pref <- prediction(p, inf_test$deposit)
+perf <- performance(pref, "tpr","fpr")
+plot(perf)
+```
+#### Conclusion: Ratio of true-positive and false-positive cases indicates a relatively good quality of the model.
+
+## Visualising the Test set results
+```{r}
+library(ggplot2)
+set = inf_test[,c("balance","duration","deposit")]
+X1 = seq(min(set["balance"]) - 1, max(set["balance"]) + 1, by = 0.05)
+X2 = seq(min(set["duration"]) - 1, max(set["duration"]) + 1, by = 0.05)
+grid_set = expand.grid(X1, X2)
+colnames(grid_set) = c("balance","duration")
+prob_set = predict(class_opt, grid_set, type = "response")
+y_grid = ifelse(prob_set > 0.5, 1, 0)
+plot(set[, -3],
+     main = "Logistic Regression",
+     xlab = "balance", ylab = "duration",
+     xlim = range(X1), ylim = range(X2))
+contour(X1, X2, matrix(as.numeric(y_grid), length(X1), length(X2)), add = TRUE)
+points(grid_set, pch = ".", col = ifelse(y_grid == 1, "tomato","springgreen3"))
+points(set, pch = 21, bg = ifelse(set[, 3] == "YES", "red3", "green4"))
+```
+#### Conclusion: Ñustomers who do not have deposits are marked in green on a graph, and those who do are in red.

@@ -1,0 +1,134 @@
+---
+title: "Classification Tree"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Upload data
+```{r}
+inf <- read.csv("bank.csv", header = TRUE, encoding = "UNICOD")
+inf <- subset(inf, select = -c(education,default,contact,pdays,poutcome,month,campaign,previous))
+require(dplyr)
+inf <- inf %>%
+      mutate(deposit = ifelse(deposit == "no",0,1))
+glimpse(inf)
+```
+
+# Splitting the dataset into the TRAIN set and TEST set
+```{r}
+set.seed(123)
+library(caTools)
+split = sample.split(inf$deposit, SplitRatio = 2/3)
+inf_train = subset(inf, split == TRUE)
+inf_test = subset(inf, split == FALSE)
+```
+#### Conclusion: dataset is split into train set and test set.
+
+# Fitting 
+```{r}
+# install.packages('rpart')
+library(rpart)
+inf_train$deposit <- as.factor(inf_train$deposit)
+inf_test$deposit <- as.factor(inf_test$deposit)
+class_dt = rpart(deposit ~ ., data = inf_train)
+```
+#### Conclusion: Basic model of the tree was built on the basis of all variables.
+
+## Predicting
+```{r}
+y <- predict(class_dt, inf_test[-9], type = 'class')
+```
+#### Conclusion: Object classes (vector y) were defined.
+
+## Confusion Matrix
+```{r}
+cm = table(inf_test[, 'deposit'], y)
+print(cm)
+```
+#### Conclusion: Accuracy of the model - (1590+1206)/3721=75.1%. Part of incorrectly classified cases - (557+368)/3721 = 24.9%. Sensitivity of the model is 1206/(1206+557)=68.4%, specificity is 1590/(1590+368)=51.2%, ie the model is more sensitive to the detection of positive cases.
+
+# Plotting the tree
+```{r}
+plot(class_dt)
+text(class_dt)
+```
+#### Conclusion: Visualization allows to analyze the logic of building a tree. In particular, clients whose duration of cooperation is less than 206 days, balance less than 61.5 and who doesn't have housing are less likely to have a deposit.
+
+# Fitting 2 factors
+```{r}
+class_ct = rpart(deposit ~ balance + duration, data = inf_train)
+```
+#### Conclusion: Model of the tree was built on the basis of 2 variables.
+
+## Predicting
+```{r}
+y <- predict(class_ct, inf_test[, c('balance','duration')], type = 'class')
+```
+#### Conclusion: Object classes (vector y) were defined.
+
+## Confusion Matrix
+```{r}
+cm = table(inf_test[, 'deposit'], y)
+print(cm)
+```
+#### Conclusion: Accuracy of the model - (1412+1288)/3721=72.6%. Part of incorrectly classified cases - (475+546)/3721 = 30.1%. Sensitivity of the model is 1288/(1288+475)=73.1%, specificity is 1412/(1412+546)=72.1%, ie the model is more sensitive to the detection of positive cases.
+
+## Visualising the Test set results
+```{r}
+library(ggplot2)
+set = inf_test[,c('balance','duration','deposit')]
+X1 = seq(min(set['balance']) - 1, max(set['balance']) + 1, by = 0.1)
+X2 = seq(min(set['duration']) - 1, max(set['duration']) + 1, by = 0.1)
+grid_set = expand.grid(X1, X2)
+colnames(grid_set) = c('balance', 'duration')
+y_grid = predict(class_ct, grid_set, type = 'class')
+plot(set[, -3],
+     main = 'Classification Tree',
+     xlab = 'balance', ylab = 'duration',
+     xlim = range(X1), ylim = range(X2))
+contour(X1, X2, matrix(as.numeric(y_grid), length(X1), length(X2)), add = TRUE)
+points(grid_set, pch = '.', col = ifelse(y_grid == 1, 'tomato', 'springgreen3'))
+points(set, pch = 21, bg = ifelse(set[, 3] == 1, 'red3', 'green4'))
+```
+
+# Fitting Random Forest Classification to the Training set
+```{r}
+# install.packages('randomForest')
+library(randomForest)
+set.seed(123)
+class_rf = randomForest(deposit ~ balance + duration, data = inf_train, ntree = 10)
+```
+#### Conclusion: Random model forest training was conducted.
+
+## Predicting
+```{r}
+y <- predict(class_rf, inf_test[, c('balance','duration')])
+```
+#### Conclusion: Object classes (vector y) were defined. To do this, was used the parameter type = ‘class’.
+
+## Confusion Matrix
+```{r}
+cm = table(inf_test[, 'deposit'], y)
+print(cm)
+```
+#### Conclusion: Accuracy of the model - (1410+1145)/3721=68.7%. Part of incorrectly classified cases - (618+548)/3721 = 31.3%. Sensitivity of the model is 1145/(1145+618)=64.9%, specificity is 1410/(1410+548)=72%, ie the model is more sensitive to the detection of positive cases.
+
+# Visualising the Test set results
+```{r}
+set = inf_test[,c('balance','duration','deposit')]
+X1 = seq(min(set['balance']) - 1, max(set['balance']) + 1, by = 0.1)
+X2 = seq(min(set['duration']) - 1, max(set['duration']) + 1, by = 0.1)
+grid_set = expand.grid(X1, X2)
+colnames(grid_set) = c('balance', 'duration')
+y_grid = predict(class_rf, grid_set)
+plot(set[, -3],
+     main = 'Random Forest',
+     xlab = 'balance', ylab = 'duration',
+     xlim = range(X1), ylim = range(X2))
+contour(X1, X2, matrix(as.numeric(y_grid), length(X1), length(X2)), add = TRUE)
+points(grid_set, pch = '.', col = ifelse(y_grid == 1, 'tomato', 'springgreen3'))
+points(set, pch = 21, bg = ifelse(set[, 3] == 1, 'red3', 'green4'))
+```
